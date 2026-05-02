@@ -1685,7 +1685,7 @@
             // Re-render UI immediately to show loading state
             const postEl = document.getElementById(`post-${postId}`);
             if(postEl) {
-                const postData = app.postsData.find(p => p.id === postId);
+                const postData = app.postsData.find(p => String(p.id) === String(postId));
                 if(postData) postEl.outerHTML = app.createPostHTML(postData, app.currentView === 'detail');
             }
 
@@ -1700,7 +1700,7 @@
                     const unlockedPost = postRes.data || postRes.post || (postRes.id ? postRes : null);
                     
                     if (unlockedPost) {
-                        const idx = app.postsData.findIndex(p => p.id === postId);
+                        const idx = app.postsData.findIndex(p => String(p.id) === String(postId));
                         if (idx > -1) app.postsData[idx] = unlockedPost;
                         
                         const newPostEl = document.getElementById(`post-${postId}`);
@@ -1719,7 +1719,7 @@
                 // Revert loading state
                 const revertedEl = document.getElementById(`post-${postId}`);
                 if (revertedEl) {
-                    const originalData = app.postsData.find(p => p.id === postId);
+                    const originalData = app.postsData.find(p => String(p.id) === String(postId));
                     if(originalData) revertedEl.outerHTML = app.createPostHTML(originalData, app.currentView === 'detail');
                 }
             } finally {
@@ -1728,7 +1728,7 @@
         };
 
         app.createPostHTML = (post, isDetail = false) => {
-            const isOwner = app.user && (app.user.id === post.user_id || app.user.role === 'admin');
+            const isOwner = app.user && (String(app.user.id) === String(post.user_id) || app.user.role === 'admin');
             const avatar = post.is_anonymous ? util.getAvatar(null, 'A') : util.getAvatar(post.author_avatar_url, post.author_display_name);
             const name = post.is_anonymous ? 'Anonim' : util.escapeHTML(post.author_display_name);
             const time = util.formatDate(post.created_at);
@@ -1907,12 +1907,12 @@
                     util.showToast(res.message || 'Komentar dihapus', 'success');
 
                     // Reload detail view (comments)
-                    if (app.currentDetailPostId === postId) {
+                    if (String(app.currentDetailPostId) === String(postId)) {
                         app.openDetail(postId, false); // don't pushstate when just reloading
                     }
 
                     // Update cached total_comments of the post
-                    const postCache = (app.postsData || []).find(p => p.id === postId);
+                    const postCache = (app.postsData || []).find(p => String(p.id) === String(postId));
                     if(postCache && res.deleted_count !== undefined) {
                         postCache.total_comments = Math.max(0, postCache.total_comments - res.deleted_count);
                         // Also update DOM if visible in feed
@@ -1938,7 +1938,7 @@
             const time = util.formatDate(comment.created_at);
             const likeIconClass = comment.liked_by_me ? 'ph-fill ph-heart text-rz_red' : 'ph ph-heart text-rz_text_secondary hover:text-white transition';
             
-            const isOwnerOrAdmin = app.user && (app.user.id === comment.user_id || app.user.role === 'admin');
+            const isOwnerOrAdmin = app.user && (String(app.user.id) === String(comment.user_id) || app.user.role === 'admin');
             let actionMenu = '';
             if (isOwnerOrAdmin) {
                 actionMenu = `
@@ -2134,7 +2134,7 @@
             if (!app.token || !id) return;
 
             // Optimistic update
-            const nIndex = app.notifications.findIndex(x => x.id === id);
+            const nIndex = app.notifications.findIndex(x => String(x.id) === String(id));
             if (nIndex > -1 && app.notifications[nIndex].is_read === 0) {
                 app.notifications[nIndex].is_read = 1;
                 app.unreadNotificationCount = Math.max(0, app.unreadNotificationCount - 1);
@@ -2614,7 +2614,7 @@
                 if(countSpan) countSpan.textContent = res.total_reposts > 0 ? res.total_reposts : '';
 
                 // Update cache
-                const postCache = (app.postsData || []).find(p => p.id === id);
+                const postCache = (app.postsData || []).find(p => String(p.id) === String(id));
                 if (postCache) {
                     postCache.reposted_by_me = res.reposted_by_me;
                     postCache.total_reposts = res.total_reposts;
@@ -2693,7 +2693,7 @@
                 }
 
                 // Update cache
-                const postCache = (app.postsData || []).find(p => p.id === id);
+                const postCache = (app.postsData || []).find(p => String(p.id) === String(id));
                 if (postCache) {
                     postCache.saved_by_me = res.saved_by_me;
                 }
@@ -2786,6 +2786,171 @@
             });
         };
 
+        // --- DETAIL & COMMENTS ---
+
+        app.openDetail = async (id, pushState = true) => {
+            app.currentDetailPostId = id;
+            document.getElementById('detail-modal').classList.remove('hidden');
+
+            if (pushState) {
+                const url = new URL(window.location);
+                url.searchParams.set('post', id);
+                history.pushState({ modal: 'detail-modal', postId: id }, '', url);
+            }
+
+            const content = document.getElementById('detail-content');
+            const inputAreaWrapper = document.getElementById('comment-input-area');
+            const fullInputWrapper = document.getElementById('comment-input-wrapper');
+
+            // Reset reply states
+            app.cancelReplyComment();
+
+            // Render Input Area secara Dinamis berdasarkan Auth State
+            if (app.user) {
+                inputAreaWrapper.innerHTML = `
+                    <img id="comment-my-avatar" src="${util.getAvatar(app.user.avatar_url, app.user.display_name)}" class="w-9 h-9 rounded-full object-cover shrink-0">
+                    <div class="relative flex-1">
+                        <input type="text" id="comment-input" placeholder="Balas... (ketik @ untuk mention)" class="w-full bg-[#1a1a1a] rounded-full px-4 py-2.5 text-[15px] text-white focus:outline-none transition-all" oninput="app.handleCommentInput(this)" onblur="setTimeout(() => { const el = document.getElementById('comment-mention-list'); if(el) el.classList.add('hidden'); }, 200)">
+                        
+                        <!-- Autocomplete Suggestions for Comments -->
+                        <div id="comment-mention-list" class="hidden absolute bottom-full left-0 mb-2 bg-[#1a1a1a] border border-rz_border rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50 w-full sm:w-[250px]"></div>
+                    </div>
+                    <button id="btn-submit-comment" onclick="app.submitComment()" class="hidden text-white font-semibold disabled:opacity-50 flex items-center justify-center shrink-0 hover:opacity-70 transition h-[40px]"><i class="ph-fill ph-arrow-circle-up text-[32px]"></i></button>
+                `;
+            } else {
+                inputAreaWrapper.innerHTML = `
+                    <div class="w-full text-center py-2">
+                        <button onclick="app.closeModal('detail-modal'); app.openAuthModal()" class="text-blue-500 font-semibold text-[15px] hover:underline transition">Masuk untuk membalas utas ini.</button>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = app.renderPostSkeleton() + app.renderPostSkeleton();
+            
+            try {
+                let post = (app.postsData || []).find(p => String(p.id) === String(id));
+                if (!post) {
+                    // Try fetch directly if opened via deep link and not in cache
+                    try {
+                        const resPost = await api(`/api/posts/${id}`);
+                        post = resPost.data || resPost.post || (resPost.id ? resPost : null);
+                        if (!post || post.success === false) throw new Error();
+                    } catch(e) {
+                        console.log('Specific post fetch failed, trying all posts...');
+                    }
+                    
+                    // Fallback to fetching all posts if specific endpoint doesn't exist
+                    if (!post) {
+                        try {
+                            const resAll = await api('/api/posts');
+                            app.postsData = resAll.data || [];
+                            post = app.postsData.find(p => String(p.id) === String(id));
+                        } catch(err) {
+                            content.innerHTML = app.renderEmpty('Postingan tidak ditemukan.');
+                            return;
+                        }
+                    }
+
+                    if (!post) {
+                        content.innerHTML = app.renderEmpty('Postingan tidak ditemukan di sesi ini.');
+                        return;
+                    }
+                }
+
+                let html = app.createPostHTML(post, true);
+                html += `<div class="border-t border-rz_border mt-2" id="comments-container">
+                            ${Array(3).fill(app.renderPostSkeleton()).join('')}
+                         </div>`;
+                content.innerHTML = html;
+
+                const resCom = await api(`/api/posts/${id}/comments`);
+                const comContainer = document.getElementById('comments-container');
+                if (!resCom.data || resCom.data.length === 0) {
+                    comContainer.innerHTML = `<div class="p-6 text-center text-rz_text_secondary text-[15px]">Belum ada balasan. Jadilah yang pertama membalas.</div>`;
+                } else {
+                    const tree = app.buildCommentTree(resCom.data);
+                    let chtml = '';
+                    tree.forEach(c => { chtml += app.createCommentHTML(c); });
+                    comContainer.innerHTML = chtml;
+                }
+
+            } catch (err) {
+                content.innerHTML = app.renderEmpty('Gagal memuat balasan. Coba lagi.');
+            }
+        };
+
+        app.startReplyComment = (commentId, authorUsername) => {
+            if (!app.user) {
+                app.openAuthModal();
+                return;
+            }
+            app.activeReplyCommentId = commentId;
+            app.activeReplyUsername = authorUsername;
+            
+            document.getElementById('reply-to-username').textContent = '@' + authorUsername;
+            document.getElementById('reply-indicator').classList.remove('hidden');
+            
+            const input = document.getElementById('comment-input');
+            if(input) input.focus();
+        };
+
+        app.cancelReplyComment = () => {
+            app.activeReplyCommentId = null;
+            app.activeReplyUsername = "";
+            const indicator = document.getElementById('reply-indicator');
+            if(indicator) indicator.classList.add('hidden');
+        };
+
+        app.submitComment = async () => {
+            if (!app.user) return app.openAuthModal();
+            const id = app.currentDetailPostId;
+            const input = document.getElementById('comment-input');
+            const val = input.value.trim();
+            if (!val) return;
+
+            const btn = document.getElementById('btn-submit-comment');
+            if(btn) btn.disabled = true;
+            input.disabled = true;
+
+            const payload = { content: val };
+            if (app.activeReplyCommentId) {
+                payload.parent_id = app.activeReplyCommentId;
+            }
+
+            try {
+                await api(`/api/posts/${id}/comments`, {
+                    method: 'POST',
+                    body: payload
+                });
+                
+                input.value = '';
+                if(btn) btn.classList.add('hidden'); // Sembunyikan kembali karena kolom kosong
+                app.cancelReplyComment();
+                util.showToast('Balasan terkirim.', 'success');
+                
+                // Refresh hitungan komentar di tampilan feed secara langsung (DOM Update)
+                const postEl = document.getElementById(`post-${id}`);
+                if (postEl) {
+                    const countEls = postEl.querySelectorAll('.comment-count');
+                    countEls.forEach(el => {
+                        el.textContent = parseInt(el.textContent || '0') + 1;
+                    });
+                }
+
+                // Perbarui data post di cache state kita
+                const postCache = (app.postsData || []).find(p => String(p.id) === String(id));
+                if(postCache) postCache.total_comments++;
+
+                // Load ulang data replies di Modal Detail
+                app.openDetail(id, false);
+            } catch (err) {
+                util.showToast(err.message, 'error');
+            } finally {
+                if(btn) btn.disabled = false;
+                input.disabled = false;
+            }
+        };
+
         // --- COMPOSER ---
 
         let composerImageFile = null;
@@ -2824,7 +2989,7 @@
 
         app.openEditPost = (id) => {
             if (!app.user) return;
-            const post = app.postsData.find(p => p.id === id);
+            const post = app.postsData.find(p => String(p.id) === String(id));
             if (!post) return;
 
             app.pushModalState('composer-modal');
@@ -3003,7 +3168,7 @@
                     if(postEl) postEl.remove();
                     util.showToast('Utas dihapus');
                     // Jika dihapus dari dalam modal detail, tutup modalnya
-                    if(app.currentDetailPostId === id) {
+                    if(String(app.currentDetailPostId) === String(id)) {
                         app.closeModal('detail-modal');
                     }
                 } catch (err) {
