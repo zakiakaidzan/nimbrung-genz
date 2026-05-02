@@ -813,9 +813,9 @@
                     splash.classList.add('opacity-0');
                     setTimeout(() => {
                         splash.classList.add('hidden');
-                    }, 500);
+                    }, 200);
                 }
-            }, 3000);
+            }, 2000);
 
             // Mulai Auto-Refresh setiap 30 detik
             setInterval(() => {
@@ -839,8 +839,8 @@
                     splash.classList.add('hidden');
                     app.renderNav();
                     app.navigate(view);
-                }, 500); // Wait for transition out
-            }, 3000); // 3.5 seconds
+                }, 200); // Wait for transition out
+            }, 2000); // 3.5 seconds
         };
 
         app.silentRefresh = async () => {
