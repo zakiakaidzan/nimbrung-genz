@@ -1612,12 +1612,12 @@
                                     <i class="ph ph-chat-circle text-[20px]"></i>
                                     <span class="text-[13px] text-rz_text_secondary comment-count">${post.total_comments > 0 ? post.total_comments : ''}</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); app.copyLink('${post.id}')" class="flex items-center gap-1 p-1 action-icon hover:bg-[#1a1a1a] rounded-full transition px-2" title="Bagikan">
-                                    <i class="ph ph-paper-plane-tilt text-[20px]"></i>
-                                </button>
                                 <button onclick="event.stopPropagation(); app.toggleRepost('${post.id}')" class="flex items-center gap-1 p-1 action-icon repost-btn hover:bg-[#1a1a1a] rounded-full transition px-2" data-id="${post.id}">
                                     <i class="${repostIconClass} text-[20px] repost-icon"></i>
                                     <span class="text-[13px] text-rz_text_secondary repost-count">${post.total_reposts > 0 ? post.total_reposts : ''}</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); app.copyLink('${post.id}')" class="flex items-center gap-1 p-1 action-icon hover:bg-[#1a1a1a] rounded-full transition px-2" title="Bagikan">
+                                    <i class="ph ph-paper-plane-tilt text-[20px]"></i>
                                 </button>
                             </div>
                             
@@ -2632,9 +2632,26 @@
                     // Try fetch directly if opened via deep link and not in cache
                     try {
                         const resPost = await api(`/api/posts/${id}`);
-                        post = resPost.data;
+                        post = resPost.data || resPost.post || (resPost.id ? resPost : null);
+                        if (!post || post.success === false) throw new Error();
                     } catch(e) {
-                        content.innerHTML = app.renderEmpty('Postingan tidak ditemukan.');
+                        console.log('Specific post fetch failed, trying all posts...');
+                    }
+                    
+                    // Fallback to fetching all posts if specific endpoint doesn't exist
+                    if (!post) {
+                        try {
+                            const resAll = await api('/api/posts');
+                            app.postsData = resAll.data || [];
+                            post = app.postsData.find(p => p.id === id);
+                        } catch(err) {
+                            content.innerHTML = app.renderEmpty('Postingan tidak ditemukan.');
+                            return;
+                        }
+                    }
+
+                    if (!post) {
+                        content.innerHTML = app.renderEmpty('Postingan tidak ditemukan di sesi ini.');
                         return;
                     }
                 }
