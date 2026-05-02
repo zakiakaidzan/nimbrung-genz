@@ -174,12 +174,12 @@
                 <div>
                     <h3 class="font-bold text-white mb-4 text-[15px]">Kategori</h3>
                     <div class="grid grid-cols-2 gap-2.5 text-[13px] text-center font-medium">
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Curhat</div>
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Kerja</div>
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Meme</div>
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Random Talk</div>
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Relationship</div>
-                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition">Sekolah</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Curhat')">Curhat</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Kerja')">Kerja</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Meme')">Meme</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Random Talk')">Random Talk</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Relationship')">Relationship</div>
+                        <div class="bg-[#1a1a1a] text-white hover:bg-[#262626] rounded-xl py-2.5 cursor-pointer transition" onclick="app.searchCategory('Sekolah')">Sekolah</div>
                     </div>
                 </div>
                 
@@ -1445,6 +1445,19 @@
             if (context === 'composer') app.checkComposerState();
         };
 
+        app.searchCategory = (categoryName) => {
+            app.closeModal('detail-modal'); // Tutup jika sedang berada di detail post
+            app.navigate('search');
+            
+            setTimeout(() => {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.value = categoryName;
+                    app.doSearch();
+                }
+            }, 50);
+        };
+
         // --- RENDER HELPERS (Threads Style) ---
 
         app.renderNotificationItem = (n) => {
@@ -1623,7 +1636,7 @@
                             
                             ${post.category_name ? `
                             <div class="text-rz_text_secondary text-[14px] flex items-center gap-1.5 mt-1">
-                                <span class="bg-[#1a1a1a] px-2 py-0.5 rounded text-[12px]">${util.escapeHTML(post.category_name)}</span>
+                                <span class="bg-[#1a1a1a] px-2 py-0.5 rounded text-[12px] hover:bg-[#262626] transition cursor-pointer" onclick="event.stopPropagation(); app.searchCategory('${util.escapeHTML(post.category_name)}')">${util.escapeHTML(post.category_name)}</span>
                             </div>` : ''}
                         </div>
                     </div>
