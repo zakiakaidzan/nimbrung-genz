@@ -140,6 +140,14 @@
 </head>
 <body class="antialiased overflow-y-scroll no-scrollbar selection:bg-gray-700 selection:text-white">
 
+    <!-- Splashscreen (Hidden by default) -->
+    <div id="splashscreen" class="hidden fixed inset-0 z-[200] bg-[#baf29d] flex items-center justify-center transition-opacity duration-500">
+        <!-- GIF Desktop -->
+        <img src="https://a0j2gt7fjm.ucarecd.net/863bddfb-1144-40a7-9cad-86873fbb4e4d/logovideo-ezgif.com-crop.gif" alt="Splash Desktop" class="hidden md:block w-[400px] h-auto object-contain">
+        <!-- GIF Mobile -->
+        <img src="https://a0j2gt7fjm.ucarecd.net/863bddfb-1144-40a7-9cad-86873fbb4e4d/logovideo-ezgif.com-crop.gif" alt="Splash Mobile" class="block md:hidden w-[300px] h-auto object-contain">
+    </div>
+
     <!-- App Shell -->
     <div class="flex justify-between w-full max-w-[1250px] mx-auto min-h-screen">
         
@@ -791,6 +799,23 @@
             }, 30000);
         };
 
+        app.showSplashAndNavigate = (view) => {
+            const splash = document.getElementById('splashscreen');
+            splash.classList.remove('hidden');
+            
+            app.closeModal('auth-modal'); // ensure auth modal is closed
+            
+            setTimeout(() => {
+                splash.classList.add('opacity-0');
+                setTimeout(() => {
+                    splash.classList.add('hidden');
+                    splash.classList.remove('opacity-0');
+                    app.renderNav();
+                    app.navigate(view);
+                }, 500); // Wait for transition out
+            }, 5000); // 5 seconds
+        };
+
         app.silentRefresh = async () => {
             // Update unread count jika login
             if (app.token) {
@@ -1252,9 +1277,7 @@
 
                 util.showToast(data.message || "Login berhasil", "success");
 
-                app.closeModal('auth-modal');
-                app.renderNav();
-                app.navigate('home'); 
+                app.showSplashAndNavigate('home'); 
 
             } catch (error) {
                 util.showToast("Gagal terhubung ke server. Coba lagi.", "error");
@@ -1331,9 +1354,7 @@
 
                 util.showToast(data.message || "Register berhasil", "success");
 
-                app.closeModal('auth-modal');
-                app.renderNav();
-                app.navigate('home');
+                app.showSplashAndNavigate('home');
 
             } catch (error) {
                 util.showToast("Gagal terhubung ke server. Coba lagi.", "error");
