@@ -549,7 +549,6 @@
             postsData: [], // All fetched posts cache
             displayedPostCount: 0, // Posts currently displayed for pagination
             isFetchingMore: false,
-            tutorialUnlockLoading: {}, // State untuk tombol buka tutorial
 
             // Configs for Navigation
             navItems: [
@@ -1636,7 +1635,6 @@
 
         app.renderTutorialLockedContent = (post) => {
             const author = util.escapeHTML(post.author || post.author_display_name || "user");
-            const loading = app.tutorialUnlockLoading[post.id];
             
             let buttonHtml = '';
             let messageHtml = util.escapeHTML(post.locked_message || "Ikuti pemilik postingan untuk membuka tutorial ini.");
@@ -1650,11 +1648,11 @@
                 messageHtml = "Masuk atau daftar dulu untuk membuka isi tutorial.";
             } else if (post.locked_reason === "FOLLOW_REQUIRED") {
                 buttonHtml = `
-                    <button onclick="event.stopPropagation(); app.unlockTutorialByFollow('${post.id}', '${author}')" class="mt-3 px-5 py-2 rounded-full bg-white text-black text-[14px] font-bold hover:bg-gray-200 transition disabled:opacity-50" ${loading ? "disabled" : ""}>
-                        ${loading ? '<i class="ph ph-spinner animate-spin"></i> Membuka...' : 'Ikuti untuk membuka'}
+                    <button onclick="event.stopPropagation(); app.closeModal('detail-modal'); app.navigate('profile', '${post.author}')" class="mt-3 px-5 py-2 rounded-full bg-white text-black text-[14px] font-bold hover:bg-gray-200 transition">
+                        Kunjungi Profil
                     </button>
                 `;
-                messageHtml = `Ikuti @${author} untuk membuka isi tutorial.`;
+                messageHtml = `Ikuti @${post.author} untuk membuka isi tutorial.`;
             }
 
             return `
@@ -1671,60 +1669,6 @@
                     </div>
                 </div>
             `;
-        };
-
-        app.unlockTutorialByFollow = async (postId, username) => {
-            if (!app.token) {
-                app.openAuthModal();
-                return;
-            }
-            if (!username) return;
-
-            app.tutorialUnlockLoading[postId] = true;
-            
-            // Re-render UI immediately to show loading state
-            const postEl = document.getElementById(`post-${postId}`);
-            if(postEl) {
-                const postData = app.postsData.find(p => String(p.id) === String(postId));
-                if(postData) postEl.outerHTML = app.createPostHTML(postData, app.currentView === 'detail');
-            }
-
-            try {
-                const res = await api(`/api/users/${username}/follow`, { method: 'POST' });
-                
-                if (res.following || res.followed_by_me === 1) {
-                    util.showToast("Berhasil mengikuti. Membuka tutorial...", "success");
-                    
-                    // Fetch unlocked post
-                    const postRes = await api(`/api/posts/${postId}`);
-                    const unlockedPost = postRes.data || postRes.post || (postRes.id ? postRes : null);
-                    
-                    if (unlockedPost) {
-                        const idx = app.postsData.findIndex(p => String(p.id) === String(postId));
-                        if (idx > -1) app.postsData[idx] = unlockedPost;
-                        
-                        const newPostEl = document.getElementById(`post-${postId}`);
-                        if (newPostEl) {
-                            newPostEl.outerHTML = app.createPostHTML(unlockedPost, app.currentView === 'detail');
-                        }
-                    } else {
-                        app.silentRefresh();
-                    }
-                } else {
-                    throw new Error("Gagal mengikuti user.");
-                }
-            } catch (err) {
-                util.showToast(err.message || "Gagal membuka tutorial", "error");
-                
-                // Revert loading state
-                const revertedEl = document.getElementById(`post-${postId}`);
-                if (revertedEl) {
-                    const originalData = app.postsData.find(p => String(p.id) === String(postId));
-                    if(originalData) revertedEl.outerHTML = app.createPostHTML(originalData, app.currentView === 'detail');
-                }
-            } finally {
-                app.tutorialUnlockLoading[postId] = false;
-            }
         };
 
         app.createPostHTML = (post, isDetail = false) => {
