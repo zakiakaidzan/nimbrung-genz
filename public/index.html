@@ -140,8 +140,8 @@
 </head>
 <body class="antialiased overflow-y-scroll no-scrollbar selection:bg-gray-700 selection:text-white">
 
-    <!-- Splashscreen (Hidden by default, triggered on Auth) -->
-    <div id="splashscreen" class="hidden fixed inset-0 z-[200] bg-[#000000] flex items-center justify-center transition-opacity duration-500 opacity-0">
+    <!-- Splashscreen (Visible by default on load) -->
+    <div id="splashscreen" class="fixed inset-0 z-[200] bg-[#000000] flex items-center justify-center transition-opacity duration-500 opacity-100">
         <!-- GIF Desktop -->
         <img src="https://res.cloudinary.com/dlkbwg9dz/image/upload/splash_cclk2v.gif" alt="Splash Desktop" class="hidden md:block w-[800px] h-auto object-contain" />
         <!-- GIF Mobile -->
@@ -805,6 +805,18 @@
 
             app.renderNav(); 
 
+            // Handle Splashscreen initial load (3.5 seconds)
+            setTimeout(() => {
+                const splash = document.getElementById('splashscreen');
+                if (splash && !splash.classList.contains('hidden')) {
+                    splash.classList.remove('opacity-100');
+                    splash.classList.add('opacity-0');
+                    setTimeout(() => {
+                        splash.classList.add('hidden');
+                    }, 500);
+                }
+            }, 3500);
+
             // Mulai Auto-Refresh setiap 30 detik
             setInterval(() => {
                 app.silentRefresh();
@@ -828,7 +840,7 @@
                     app.renderNav();
                     app.navigate(view);
                 }, 500); // Wait for transition out
-            }, 5000); // 5 seconds
+            }, 3500); // 3.5 seconds
         };
 
         app.silentRefresh = async () => {
@@ -1610,6 +1622,7 @@
             // Setup Image Grid Logic
             let imageHtml = '';
             if (post.images && post.images.length > 0) {
+                // Setup Image Grid Logic
                 const imgs = post.images;
                 let gridHtml = '';
                 if (imgs.length === 1) {
@@ -2820,6 +2833,8 @@
         };
 
         // --- COMPOSER ---
+
+        let composerImageFile = null;
 
         app.openComposer = () => {
             if (!app.user) return app.openAuthModal();
