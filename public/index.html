@@ -907,7 +907,7 @@
             }
 
             if (app.currentView === 'search') return;
-            if (app.currentView === 'messages') return; // Skip feed reload in messages view to prevent input focus loss
+            if (app.currentView === 'messages') return; 
 
             const scrollPos = window.scrollY;
             
@@ -1189,8 +1189,17 @@
                     break;
                 case 'messages':
                     app.currentHeaderHTML = '';
+                    if (window.innerWidth < 640) {
+                        app.activeConversationId = null;
+                        app.activeConversation = null;
+                        app.activeMessages = [];
+                        app.messagesLoading = false;
+                    }
                     app.loadMessageConversations();
                     app.loadUnreadMessageCount();
+                    if (window.innerWidth >= 640 && app.activeConversationId) {
+                        app.loadConversationMessages(app.activeConversationId, true);
+                    }
                     break;
             }
         };
@@ -1607,6 +1616,10 @@
         app.openImagePreview = (url) => {
             app.pushModalState('image-preview-modal');
             document.getElementById('image-preview-modal-content').src = url;
+            document.getElementById('image-preview-modal-content').onclick = (e) => {
+                e.stopPropagation();
+                app.closeImagePreview();
+            };
             document.getElementById('image-preview-modal').classList.remove('hidden');
         };
 
@@ -2486,18 +2499,20 @@
         };
 
         // --- MESSAGES LOGIC ---
-        app.loadMessageConversations = async () => {
+        app.loadMessageConversations = async (isSilent = false) => {
             if (!app.token) { app.openAuthModal(); return; }
             
-            app.conversationsLoading = true;
-            app.renderMessagesView();
+            if (!isSilent) {
+                app.conversationsLoading = true;
+                app.renderMessagesView();
+            }
 
             try {
                 const res = await api('/api/messages/conversations');
                 app.conversations = res.data || [];
             } catch (error) {
-                util.showToast("Gagal memuat daftar pesan. Coba lagi.", "error");
-                app.conversations = [];
+                if (!isSilent) util.showToast("Gagal memuat daftar pesan. Coba lagi.", "error");
+                if (!isSilent) app.conversations = [];
             } finally {
                 app.conversationsLoading = false;
                 app.renderMessagesView();
@@ -2515,10 +2530,13 @@
             await app.loadUnreadMessageCount();
         };
 
-        app.loadConversationMessages = async (conversationId) => {
+        app.loadConversationMessages = async (conversationId, isSilent = false) => {
             if (!app.token) { app.openAuthModal(); return; }
-            app.messagesLoading = true;
-            app.renderMessagesView();
+            
+            if (!isSilent) {
+                app.messagesLoading = true;
+                app.renderMessagesView();
+            }
 
             try {
                 const res = await api(`/api/messages/conversations/${conversationId}`);
@@ -2529,7 +2547,7 @@
             } finally {
                 app.messagesLoading = false;
                 app.renderMessagesView(); 
-                setTimeout(app.scrollChatToBottom, 50);
+                if (!isSilent) setTimeout(app.scrollChatToBottom, 50);
             }
         };
 
@@ -2552,8 +2570,8 @@
                 
                 if (input) input.value = "";
                 
-                await app.loadConversationMessages(app.activeConversationId);
-                app.loadMessageConversations();
+                await app.loadConversationMessages(app.activeConversationId, true);
+                app.loadMessageConversations(true);
                 app.loadUnreadMessageCount();
             } catch (error) {
                 util.showToast("Gagal mengirim pesan", "error");
@@ -2654,6 +2672,7 @@
             app.activeConversationId = null;
             app.activeConversation = null;
             app.activeMessages = [];
+            app.messagesLoading = false;
             app.renderMessagesView();
         };
 
